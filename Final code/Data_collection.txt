@@ -1,0 +1,54 @@
+import cv2
+import mediapipe as mp
+import time
+import math
+from tensorflow.keras.models import load_model
+import numpy as np
+import serial
+import keyboard
+import datetime
+
+mpDraw = mp.solutions.drawing_utils
+mpPose = mp.solutions.pose
+pose = mpPose.Pose()
+
+cap = cv2.VideoCapture(0)
+
+f = open("test.csv","a")
+pTime = 0
+key = keyboard.read_key()
+
+if key == 'z':
+    time.sleep(8)
+    start_time = datetime.datetime.now()
+    while True:
+        success, img = cap.read()
+        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = pose.process(imgRGB)
+        # print(results.pose_landmarks)
+        lmList = []
+        if results.pose_landmarks:
+            mpDraw.draw_landmarks(img, results.pose_landmarks, mpPose.POSE_CONNECTIONS)
+            for id, lm in enumerate(results.pose_landmarks.landmark):
+                h, w, c = img.shape
+                #print(h,w,c)
+                #print(id, lm)
+                cx, cy = int(lm.x * w), int(lm.y * h)
+                cv2.circle(img, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
+                lmList.append([id + 1, cx, cy])
+
+        if lmList != []:
+            print(lmList)
+            f.write(str(lmList) + "\n")
+        later_time = datetime.datetime.now()
+        difference = later_time - start_time
+        sec_diff = difference.total_seconds()
+        sec_diff = round(sec_diff)
+        #print(sec_diff)
+        #print("\n")
+        if sec_diff == 40:
+            break
+
+
+        cv2.imshow("Image", img)
+        cv2.waitKey(10)

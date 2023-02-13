@@ -1,0 +1,77 @@
+import cv2
+import mediapipe as mp
+import time
+import math
+from tensorflow.keras.models import load_model
+import numpy as np
+from tensorflow.keras.preprocessing import image
+#import serial
+
+#arduino = serial.Serial('COM5',9600)
+count = 0
+a = '3'
+
+cx = [0 for x in range(33)]
+cy = [0 for y in range(33)]
+image_shape = (300,105,3)
+
+mpDraw = mp.solutions.drawing_utils
+mpPose = mp.solutions.pose
+pose = mpPose.Pose()
+
+cap = cv2.VideoCapture(0)
+
+model = load_model("stick_figure_CNN1.h5")
+
+while True:
+    success, img = cap.read()
+    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = pose.process(imgRGB)
+    image_bg = np.zeros((480, 640, 3))
+    # print(results.pose_landmarks)
+    lmList = []
+    if results.pose_landmarks:
+        mpDraw.draw_landmarks(image_bg, results.pose_landmarks, mpPose.POSE_CONNECTIONS)
+        for id, lm in enumerate(results.pose_landmarks.landmark):
+            h, w, c = img.shape
+            print(h, w, c)
+            print(id, lm)
+            cx[id], cy[id] = int(lm.x * w), int(lm.y * h)
+        x_max = max(cx)
+        x_min = min(cx)
+        y_max = max(cy)
+        y_min = min(cy)
+        roi = image_bg[y_min - 10:y_max + 10, x_min - 10:x_max + 10]
+        lmList.append([cx, cy])
+        path = f"D:\\Pycharm\\Anomalous_detection_CNN\\data\\process\\Image{0}.png"
+        cv2.imwrite(path, roi)
+
+    if len(lmList) != 0:
+        print(lmList)
+        my_image = image.load_img(path, target_size=image_shape)
+        my_image = image.img_to_array(my_image)
+        my_image = np.expand_dims(my_image, axis=0)
+        res = model.predict(my_image)
+        if(res == [0]):
+            cv2.putText(img, str("Abnormal"), (70, 50), cv2.FONT_HERSHEY_PLAIN, 5,(0, 0, 255), 4)
+            #arduino.write(str.encode('1'))
+            cv2.rectangle(img, (0, 0), (640, 480), (0, 0, 255),6)
+            a= '1'
+        elif(res == [1]):
+            cv2.putText(img, str("Normal"), (70, 50), cv2.FONT_HERSHEY_PLAIN, 5,(0, 0, 255), 4)
+            #arduino.write(str.encode('1'))
+            cv2.rectangle(img, (0, 0), (640, 480), (0, 0, 255), 6)
+            a = '1'
+
+    count = count + 1
+    if (count == 3 and a=='1'):
+        #arduino.write(str.encode(a))
+        print(str.encode(a))
+        count = 0
+    elif(count == 3 and a=='2'):
+        #arduino.write(str.encode(a))
+        print(str.encode(a))
+        count = 0
+
+    cv2.imshow("Image", img)
+    cv2.waitKey(2)
